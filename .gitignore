@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node (Laya worker dependencies)
+node_modules/
+
+# Runtime artifacts (screenshots, logs)
+pictures/
+*.log
+
+# Local personal config - contains absolute paths (search roots, vault path)
+config.json
+
+# Memory index caches, if a vault is ever pointed inside the project
+.jarvis-index/
+
+# OS junk
+Thumbs.db
+Desktop.ini
+
+mini-jarvis-implementation-plan.md
+AGENTS.md
