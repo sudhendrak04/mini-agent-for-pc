@@ -17,7 +17,6 @@ CONFIG_PATH = PROJECT_ROOT / "config.json"
 
 @dataclass
 class Config:
-    poll_interval: float = 0.3
     confidence_threshold: float = 0.6
     planner_model: str = "llama3:latest"
     search_paths: list[str] = field(default_factory=list)
@@ -28,6 +27,12 @@ class Config:
     memory_log_activity: bool = False
     reminder_poll_seconds: int = 30
     reminder_startup_grace_minutes: int = 10
+    stt_model: str = "small"
+    stt_device: str = "cpu"
+    stt_compute_type: str = "int8"
+    stt_language: str = "en"
+    stt_input_device: str = ""
+    stt_initial_prompt: str = ""
 
 
 def _as_float(raw: dict, key: str, default: float) -> float:
@@ -78,7 +83,6 @@ def load() -> Config:
     except (OSError, ValueError):
         raw = {}
     return Config(
-        poll_interval=_as_float(raw, "poll_interval", 0.3),
         confidence_threshold=_as_float(raw, "confidence_threshold", 0.6),
         planner_model=_as_str(raw, "planner_model", "llama3:latest"),
         search_paths=_as_str_list(raw, "search_paths"),
@@ -89,4 +93,10 @@ def load() -> Config:
         memory_log_activity=_as_bool(raw, "memory_log_activity", False),
         reminder_poll_seconds=_as_int(raw, "reminder_poll_seconds", 30),
         reminder_startup_grace_minutes=_as_int(raw, "reminder_startup_grace_minutes", 10),
+        stt_model=_as_str(raw, "stt_model", "small"),
+        stt_device=_as_str(raw, "stt_device", "cpu"),
+        stt_compute_type=_as_str(raw, "stt_compute_type", "int8"),
+        stt_language=_as_str(raw, "stt_language", "en"),
+        stt_input_device=_as_str(raw, "stt_input_device", ""),
+        stt_initial_prompt=_as_str(raw, "stt_initial_prompt", ""),
     )

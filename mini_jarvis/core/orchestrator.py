@@ -1,9 +1,9 @@
 """Mini Jarvis - orchestrator loop.
 
-Clipboard feed -> intent classification (rules + Laya) -> safety gate ->
-tool execution (apps, browser, screenshot, volume, files, typing).
-Compound phrasings and COMPLEX_TASK go to the local Ollama planner; every
-plan step runs through the same registry and safety gates.
+Microphone (Silero VAD + faster-whisper) -> intent classification (rules +
+Laya) -> safety gate -> tool execution (apps, browser, screenshot, volume,
+files, typing). Compound phrasings and COMPLEX_TASK go to the local Ollama
+planner; every plan step runs through the same registry and safety gates.
 
 State changes go through the events stream (mini_jarvis/events.py)
 instead of prints, so later phases can observe the pipeline without
@@ -13,9 +13,8 @@ touching this loop.
 import queue
 
 from mini_jarvis import config, events
-from mini_jarvis.core.safety import NO_WORDS, YES_WORDS
-from mini_jarvis.io import clipboard_feed
-from mini_jarvis.io.clipboard_feed import TranscriptFeed
+from mini_jarvis.core.safety import NO_WORDS, YES_WORDS, STT_ANSWER_CHANNEL
+from mini_jarvis.io.stt_feed import SttFeed
 from mini_jarvis.memory import activity, reminders
 from mini_jarvis.nlu import slot_filler
 from mini_jarvis.nlu.classifier import LayaClassifier
@@ -33,8 +32,14 @@ def main() -> None:
     classifier = LayaClassifier(threshold=cfg.confidence_threshold)
     classifier.start()
 
-    feed = TranscriptFeed(cfg.poll_interval)
-    feed.start()
+    # The microphone is the only input now (Handy/clipboard is out of the
+    # pipeline). The same transcript queue feeds the safety gate, so a
+    # spoken "yes" answers a pending confirmation.
+    feed = SttFeed()
+    STT_ANSWER_CHANNEL.bind(feed)
+    if not feed.start():
+        events.emit("assistant_unavailable", reason="microphone feed did not start")
+        return
 
     reminders.start_scheduler()
 
@@ -45,13 +50,11 @@ def main() -> None:
 
     try:
         while True:
-            # The feed keeps polling while tools run, so a slow tool never
-            # swallows a transcript spoken in the meantime.
+            # The feed keeps transcribing while tools run, so a slow tool
+            # never swallows a command spoken in the meantime.
             try:
-                seq, transcript = feed.events.get(timeout=1.0)
+                _seq, transcript = feed.events.get(timeout=1.0)
             except queue.Empty:
-                continue
-            if clipboard_feed.is_skipped(seq):  # consumed by a confirmation
                 continue
 
             events.emit("transcript_received", text=transcript)

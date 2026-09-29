@@ -12,9 +12,10 @@ The level of each tool comes from the unified intent schema
 SENSITIVE: a tool that forgets to declare its level errs on the side of
 asking.
 
-A "yes" can be spoken (via an AnswerChannel - clipboard-backed by
-default) or typed in the console. Anything else, or silence within the
-timeout, cancels the action.
+A "yes" can be spoken (SttAnswerChannel - a transcript that is a yes/no
+word answers the pending confirmation instead of becoming a command) or
+typed in the console. Anything else, or silence within the timeout,
+cancels the action.
 """
 
 import queue
@@ -79,51 +80,42 @@ class AnswerChannel(Protocol):
     def poll(self, max_wait: float = 0.5) -> str | None: ...
 
 
-class ClipboardAnswerChannel:
-    """Current behavior, extracted unchanged: watch the clipboard for a
-    spoken yes/no ("say yes" while the prompt is up).
+class SttAnswerChannel:
+    """Spoken yes/no straight from the microphone.
 
-    Answer events are marked consumed so the transcript feed does not
-    later yield them as commands. Non-answer speech is left untouched -
-    it is processed as a normal command once the prompt resolves.
+    While a confirmation is up the STT feed keeps transcribing. This
+    channel drains the same queue the orchestrator reads: a yes/no word
+    answers the prompt, anything else is put back so it is processed as a
+    normal command once the prompt resolves - the contract the old
+    clipboard channel had. Bound to the running feed by the orchestrator
+    at startup; unbound, it simply never answers.
     """
 
     def __init__(self) -> None:
-        # Last clipboard sequence number this poller has seen. Kept on
-        # the instance ON PURPOSE: poll() is called in short bursts, and
-        # a copy landing between two calls must still be noticed.
-        self._last_seen_seq: int | None = None
+        self._queue: "queue.Queue[tuple[int, str]] | None" = None
+
+    def bind(self, feed) -> None:
+        """Attach the live feed (anything exposing .events as a queue)."""
+        self._queue = getattr(feed, "events", feed)
 
     def poll(self, max_wait: float = 0.5) -> str | None:
-        # Late import: only the clipboard-backed channel needs the
-        # clipboard module; the gate itself stays input-source agnostic.
-        from mini_jarvis.io import clipboard_feed
-
-        if self._last_seen_seq is None:
-            # First call: baseline at the current event, skipping stale
-            # content that predates the prompt.
-            self._last_seen_seq = clipboard_feed.get_clipboard_sequence_number()
-        deadline = time.time() + max_wait
-        while time.time() < deadline:
-            seq = clipboard_feed.get_clipboard_sequence_number()
-            if seq != self._last_seen_seq:
-                text = clipboard_feed.read_clipboard_text().strip()
-                if not text:
-                    # clipboard locked by another poller - retry same seq
-                    time.sleep(0.05)
-                    continue
-                self._last_seen_seq = seq
-                answer = normalize_command(text).strip(" .!?")
-                if answer in YES_WORDS or answer in NO_WORDS:
-                    clipboard_feed.mark_sequence_consumed(seq)
-                    return answer
-            time.sleep(0.2)
+        if self._queue is None:
+            return None
+        try:
+            seq, text = self._queue.get(timeout=max_wait)
+        except queue.Empty:
+            return None
+        answer = normalize_command(text).strip(" .!?")
+        if answer in YES_WORDS or answer in NO_WORDS:
+            return answer
+        self._queue.put((seq, text))  # not an answer - keep it for the loop
         return None
 
 
-# Shared default so poll state persists across confirmations, exactly as
-# the previous module-level global did.
-_DEFAULT_ANSWER_CHANNEL: AnswerChannel = ClipboardAnswerChannel()
+# Shared default so poll state persists across confirmations. The
+# orchestrator binds the running STT feed to it at startup.
+_DEFAULT_ANSWER_CHANNEL: AnswerChannel = SttAnswerChannel()
+STT_ANSWER_CHANNEL = _DEFAULT_ANSWER_CHANNEL
 
 
 # One shared reader thread for typed confirmations. A per-prompt thread

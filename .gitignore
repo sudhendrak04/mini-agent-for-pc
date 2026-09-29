@@ -23,5 +23,12 @@ config.json
 Thumbs.db
 Desktop.ini
 
+# Orb frontend build outputs
+mini-jarvis-orb/dist/
+mini-jarvis-orb/dist-electron/
+
+# Downloaded Whisper model weights (fetched with curl, not committed)
+models/
+
 mini-jarvis-implementation-plan.md
 AGENTS.md

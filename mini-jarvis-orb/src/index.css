@@ -1,0 +1,54 @@
+/* Mini Jarvis orb - visual values follow the orb plan's demo (section 1.1).
+   The demo's Tailwind classes are reproduced as plain CSS: the pill's look
+   is inline-style driven anyway, and this keeps the dependency set small. */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+/* Drag handle: the whole widget, minus the canvas (section 3). The canvas
+   stays separately clickable so click behavior can be added later. */
+.orb-drag-region {
+  -webkit-app-region: drag;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orb-drag-region canvas {
+  -webkit-app-region: no-drag;
+}
+
+.orb-pill {
+  display: inline-flex;
+  height: 74px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 9999px;
+  padding: 0 24px 0 9px;
+  background: rgba(15, 15, 15, 0.75);
+  box-shadow:
+    inset 0 0 0 1px rgba(44, 47, 54, 0.31),
+    inset 0 0 50px 0 rgba(255, 255, 255, 0.012);
+  transition: opacity 0.3s ease;
+}
+
+.orb-canvas-wrap canvas {
+  width: 3.5rem !important;
+  height: 3.5rem !important;
+}
+
+.orb-label {
+  white-space: nowrap;
+  font-size: 14px;
+  line-height: 24px;
+  color: rgba(251, 251, 251, 0.6);
+}

@@ -40,6 +40,8 @@ def _format(event: str, f: dict[str, Any]) -> str | None:
         )
     if event == "assistant_stopped":
         return "\n[JARVIS] stopped."
+    if event == "assistant_unavailable":
+        return f"[JARVIS] cannot start: {f['reason']}."
     if event == "transcript_received":
         return f"[TRANSCRIPT] {f['text']}"
     if event == "stray_answer":
@@ -61,7 +63,7 @@ def _format(event: str, f: dict[str, Any]) -> str | None:
     if event == "confirm_requested":
         return (
             f"[CONFIRM:{f['level']}] about to: {f['description']}\n"
-            "   say 'yes' via Handy or type y/yes - 'no'/silence cancels"
+            "   say 'yes' or type y/yes - 'no'/silence cancels"
         )
     if event == "confirm_resolved":
         result = f.get("result")
@@ -126,6 +128,10 @@ def _format(event: str, f: dict[str, Any]) -> str | None:
         return f"[SLOTS] model extraction failed ({f['intent']}): {f['error']}"
     if event == "activity_notice":
         return f"[ACTIVITY] {f['message']}"
+    if event == "stt_status":
+        return f"[STT] {f['message']}"
+    if event == "stt_transcript":
+        return f"[STT] ({f['seconds']}s audio, {f['latency']}s) {f['text']}"
     return None
 
 
