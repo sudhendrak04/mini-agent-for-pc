@@ -1,9 +1,28 @@
 import { app, BrowserWindow, ipcMain } from "electron"
+import fs from "node:fs"
 import path from "node:path"
 
 // Breathing room around the pill so nothing clips at the edge, and so a
 // future outer glow/shadow has room to render without getting cut off.
 const PADDING = 16
+
+// The orb must talk to whatever port the Python assistant is broadcasting
+// on, so read it from the assistant's config.json (default 8765 if the
+// file is missing or unreadable - e.g. running the orb on its own).
+const DEFAULT_PORT = 8765
+
+function backendPort(): number {
+  try {
+    const configPath = path.join(__dirname, "..", "..", "config.json")
+    const raw = JSON.parse(fs.readFileSync(configPath, "utf8"))
+    const port = Number(raw.orb_websocket_port)
+    return Number.isInteger(port) && port > 0 ? port : DEFAULT_PORT
+  } catch {
+    return DEFAULT_PORT
+  }
+}
+
+ipcMain.handle("orb-config", () => ({ port: backendPort() }))
 
 let win: BrowserWindow | null = null
 let shown = false

@@ -2,12 +2,6 @@ import { useEffect, useRef } from "react"
 import { ThinkingOrb, type OrbState } from "./components/ui/thinking-orbs"
 import { useOrbConnection } from "./ws"
 
-declare global {
-  interface Window {
-    orbAPI?: { resize: (width: number, height: number) => void }
-  }
-}
-
 // The visual pattern from the orb plan's demo (section 4): orb + status
 // pill. The label only appears when the backend sent one, so idle stays
 // a small unobtrusive orb; thinking/confirming/acting show the detail.

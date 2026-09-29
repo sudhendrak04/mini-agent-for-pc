@@ -7,9 +7,10 @@
 import { useEffect, useRef, useState } from "react"
 import type { OrbState } from "./components/ui/thinking-orbs"
 
-// Must match the backend's orb_websocket_port in config.json - never
-// hardcode two different values (orb plan section 5.4).
-const WS_URL = "ws://localhost:8765"
+// Port comes from the assistant's config.json via the Electron bridge, so
+// the two sides can never disagree; a plain browser tab (no bridge) falls
+// back to the documented default.
+const DEFAULT_PORT = 8765
 const RECONNECT_MIN_MS = 1000
 const RECONNECT_MAX_MS = 15000
 
@@ -52,8 +53,18 @@ function mapStateToOrb(
   }
 }
 
+async function backendUrl(): Promise<string> {
+  try {
+    const cfg = await window.orbAPI?.getConfig?.()
+    const port = cfg?.port ?? DEFAULT_PORT
+    return `ws://localhost:${port}`
+  } catch {
+    return `ws://localhost:${DEFAULT_PORT}`
+  }
+}
+
 export function useOrbConnection() {
-  const [visual, setVisual] = useState<OrbVisual>("shaping")
+  const [visual, setVisual] = useState<OrbVisual>("breathing")
   const [label, setLabel] = useState("")
   const [speed, setSpeed] = useState(IDLE_SPEED)
   const [connected, setConnected] = useState(false)
@@ -64,8 +75,10 @@ export function useOrbConnection() {
     let cancelled = false
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined
 
-    function connect() {
-      ws = new WebSocket(WS_URL)
+    async function connect() {
+      const url = await backendUrl()
+      if (cancelled) return
+      ws = new WebSocket(url)
       ws.onopen = () => {
         setConnected(true)
         retryDelay.current = RECONNECT_MIN_MS
