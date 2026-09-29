@@ -160,6 +160,7 @@ class SpeechSegmenter:
         max_segment_s: float = MAX_SEGMENT_S,
         min_silence_ms: int = MIN_SILENCE_MS,
         check_every_s: float = CHECK_EVERY_S,
+        on_speech_start=None,
     ) -> None:
         from faster_whisper import vad
 
@@ -170,6 +171,8 @@ class SpeechSegmenter:
         self._check_every = int(check_every_s * sample_rate)
         self._buffer = np.empty(0, dtype=np.float32)
         self._since_check = 0
+        self._speaking = False
+        self._on_speech_start = on_speech_start
         self._options = vad.VadOptions(
             threshold=0.5,
             min_speech_duration_ms=200,
@@ -204,6 +207,8 @@ class SpeechSegmenter:
             return []
 
         if not timestamps:
+            if self._speaking:
+                self._speaking = False
             if buffer.shape[0] > self._window_samples:
                 self._buffer = buffer[-self._window_samples :]
             return []
@@ -219,6 +224,13 @@ class SpeechSegmenter:
                 cut = end
         last = timestamps[-1]
         ongoing = int(last["end"]) >= edge
+        # Voice onset/offset drives the orb's "listening" state.
+        if ongoing and not self._speaking:
+            self._speaking = True
+            if self._on_speech_start is not None:
+                self._on_speech_start()
+        elif not ongoing and self._speaking:
+            self._speaking = False
         if ongoing and buffer.shape[0] >= self._max_samples:
             begin = min(int(last["start"]), buffer.shape[0])
             segments.append(buffer[begin:])
@@ -285,7 +297,9 @@ class TranscriptSource:
 
     def _run(self, model) -> None:
         cfg = config.load()
-        segmenter = SpeechSegmenter()
+        segmenter = SpeechSegmenter(
+            on_speech_start=lambda: events.emit("stt_speech_start")
+        )
         while not self._stop.is_set():
             try:
                 block = self._blocks.get(timeout=0.2)
@@ -298,10 +312,13 @@ class TranscriptSource:
                 # A VAD/segmentation hiccup must never kill transcription
                 # for the rest of the session - report it and continue.
                 events.emit("stt_status", message=f"segmentation error: {error}")
-                segmenter = SpeechSegmenter()
+                segmenter = SpeechSegmenter(
+                    on_speech_start=lambda: events.emit("stt_speech_start")
+                )
 
     def _transcribe(self, model, audio: np.ndarray, cfg) -> None:
         started = time.time()
+        events.emit("stt_transcribing", seconds=round(audio.shape[0] / SAMPLE_RATE, 2))
         try:
             segments, info = model.transcribe(
                 audio,

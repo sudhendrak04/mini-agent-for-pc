@@ -33,6 +33,7 @@ class Config:
     stt_language: str = "en"
     stt_input_device: str = ""
     stt_initial_prompt: str = ""
+    orb_websocket_port: int = 8765
 
 
 def _as_float(raw: dict, key: str, default: float) -> float:
@@ -99,4 +100,5 @@ def load() -> Config:
         stt_language=_as_str(raw, "stt_language", "en"),
         stt_input_device=_as_str(raw, "stt_input_device", ""),
         stt_initial_prompt=_as_str(raw, "stt_initial_prompt", ""),
+        orb_websocket_port=_as_int(raw, "orb_websocket_port", 8765),
     )

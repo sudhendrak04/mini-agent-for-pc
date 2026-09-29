@@ -13,6 +13,7 @@ touching this loop.
 import queue
 
 from mini_jarvis import config, events
+from mini_jarvis.core.orb_broadcaster import OrbBroadcaster
 from mini_jarvis.core.safety import NO_WORDS, YES_WORDS, STT_ANSWER_CHANNEL
 from mini_jarvis.io.stt_feed import SttFeed
 from mini_jarvis.memory import activity, reminders
@@ -46,6 +47,10 @@ def main() -> None:
     if cfg.memory_log_activity and cfg.memory_vault_path:
         activity.install()
 
+    # Phase 9: the orb is a second subscriber to the event stream; the
+    # broadcaster only translates events, it never drives the pipeline.
+    OrbBroadcaster().start()
+
     events.emit("assistant_ready", threshold=cfg.confidence_threshold)
 
     try:
@@ -63,6 +68,7 @@ def main() -> None:
                 # A yes/no that no confirmation asked for - ignore it so it
                 # is never misread as a command.
                 events.emit("stray_answer")
+                events.emit("assistant_idle")
                 continue
 
             last_launched = None  # app launched by a previous sub-command
@@ -73,6 +79,7 @@ def main() -> None:
                 # sentence - the LLM planner decides instead.
                 events.emit("compound_detected", command=commands[0])
                 registry.execute("COMPLEX_TASK", {}, commands[0])
+                events.emit("assistant_idle")
                 continue
 
             for command in commands:
@@ -105,5 +112,6 @@ def main() -> None:
                 registry.execute(intent, slots, command)
                 if intent == "OPEN_APPLICATION" and slots.get("app"):
                     last_launched = slots["app"]
+            events.emit("assistant_idle")
     except KeyboardInterrupt:
         events.emit("assistant_stopped")

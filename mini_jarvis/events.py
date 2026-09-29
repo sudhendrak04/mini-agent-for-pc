@@ -132,6 +132,8 @@ def _format(event: str, f: dict[str, Any]) -> str | None:
         return f"[STT] {f['message']}"
     if event == "stt_transcript":
         return f"[STT] ({f['seconds']}s audio, {f['latency']}s) {f['text']}"
+    if event == "orb_broadcaster_error":
+        return f"[ORB] broadcaster error: {f['message']}"
     return None
 
 

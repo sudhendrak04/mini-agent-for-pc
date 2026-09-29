@@ -96,13 +96,22 @@ def execute(intent: str, slots: dict, transcript: str = "") -> None:
     if level is not Level.SAFE:
         approved = confirm(description, level)
         if not approved:
-            events.emit("tool_cancelled", description=description)
+            events.emit(
+                "tool_cancelled", tool=func.__name__, description=description
+            )
             return
 
     try:
         result = func(*args, **kwargs)
-        events.emit("tool_run", description=description, result=result)
+        events.emit("tool_run", tool=func.__name__, description=description, result=result)
     except ToolFailure as failure:
-        events.emit("tool_failed", description=description, error=failure)
+        events.emit(
+            "tool_failed", tool=func.__name__, description=description, error=failure
+        )
     except Exception as unexpected:  # a broken tool must never kill the loop
-        events.emit("tool_error", description=description, error=unexpected)
+        events.emit(
+            "tool_error",
+            tool=func.__name__,
+            description=description,
+            error=unexpected,
+        )
